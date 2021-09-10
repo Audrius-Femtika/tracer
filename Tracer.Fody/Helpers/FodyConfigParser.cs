@@ -15,7 +15,7 @@ namespace Tracer.Fody.Helpers
     /// <summary>
     /// Class that parses the fody configuration belonging to tracer (in FodyWeavers.xml file).
     /// </summary>
-    internal class FodyConfigParser
+    public class FodyConfigParser
     {
         private FodyConfigParser()
         { }
