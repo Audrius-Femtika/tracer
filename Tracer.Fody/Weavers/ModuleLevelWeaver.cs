@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
 using Mono.Cecil;
 using Mono.Cecil.Rocks;
 using Tracer.Fody.Helpers;
@@ -25,6 +21,24 @@ namespace Tracer.Fody.Weavers
             _configuration = configuration;
             _moduleDefinition = moduleDefinition;
         }
+
+        /*private static void RemoveCoreDllReferenceFromFrameWork(ModuleDefinition moduleDefinition)
+        {
+            string fullName = typeof(TargetFrameworkAttribute).FullName;
+            var targetFrameworkAttribute = moduleDefinition.Assembly.CustomAttributes.SingleOrDefault(a => a.AttributeType.FullName == fullName);
+
+            string targetFramework = (string)targetFrameworkAttribute.ConstructorArguments[0].Value;
+            if (targetFramework.StartsWith(".NETFramework"))
+            {
+
+                Assembly assem = Assembly.GetAssembly(typeof(object));
+                AssemblyNameReference assemblyToRemove = moduleDefinition.AssemblyReferences.SingleOrDefault(a => a.Name == "System.Private.CoreLib");
+                moduleDefinition.AssemblyReferences.Remove(assemblyToRemove);
+
+            }
+        
+        }*/
+
 
         /// <summary>
         /// Weaves the logging and tracing into the given module. Please note that the module itself is modified.
@@ -47,6 +61,7 @@ namespace Tracer.Fody.Weavers
                 var timer = Stopwatch.StartNew();
                 var weaver = new ModuleLevelWeaver(configuration, moduleDefinition);
                 weaver.InternalExecute();
+                //RemoveCoreDllReferenceFromFrameWork(moduleDefinition);
                 timer.Stop();
                 WeavingLog.LogInfo(String.Format("Tracer: Weaving done in {0} ms.", timer.ElapsedMilliseconds));
             }
@@ -82,6 +97,9 @@ namespace Tracer.Fody.Weavers
                 if (loggerReference == null)
                 {
                     loggerReference = _configuration.AssemblyNameReference;
+                    //loggerReference.HasPublicKey = false;
+                    //loggerReference.PublicKeyToken = null;
+                    //loggerReference.PublicKey = null;
                     _moduleDefinition.AssemblyReferences.Add(loggerReference);
                 }
                 _loggerScope = loggerReference;

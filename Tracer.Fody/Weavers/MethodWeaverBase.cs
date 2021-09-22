@@ -6,6 +6,7 @@ using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Mono.Cecil.Rocks;
 using Tracer.Fody.Helpers;
+using System.Diagnostics;
 
 namespace Tracer.Fody.Weavers
 {
@@ -21,6 +22,9 @@ namespace Tracer.Fody.Weavers
 
         protected const string ExceptionMarker = "$exception";
         protected const string StartTickVarName = "$startTick";
+
+        protected IEnumerable<Instruction> copiedInstructions;
+        protected ICollection<ExceptionHandler> copiedExceptionHandlers;
 
         internal MethodWeaverBase(TypeReferenceProvider typeReferenceProvider, MethodReferenceProvider methodReferenceProvider,
                 ILoggerProvider loggerProvider, MethodDefinition methodDefinition)
@@ -52,6 +56,8 @@ namespace Tracer.Fody.Weavers
 
             HasNoTraceOnReturnValue = _methodDefinition.CustomAttributes.Any(attr =>
                                           attr.AttributeType.FullName.Equals("TracerAttributes.NoReturnTrace", StringComparison.Ordinal));
+            copiedInstructions = _body.Instructions.CloneInstructions();
+            copiedExceptionHandlers = _body.ExceptionHandlers.CopyExceptions(copiedInstructions);
         }
 
         private bool IsConstructorCall(Instruction ins)
@@ -90,7 +96,61 @@ namespace Tracer.Fody.Weavers
         }
 
         protected bool HasNoTraceOnReturnValue;
-       
+
+        protected void PrintBodyInstructions(string label)
+        {
+            Debug.WriteLine("------- Start " + label + "-----");
+            foreach (Instruction instr in _body.Instructions)
+            {
+                Debug.WriteLine(instr);
+            }
+            Debug.WriteLine("------- end " + label + "-----");
+        }
+
+        private void AddDuplicateMethod()
+        {
+            string newMethodName = _body.Method.Name + "_weawed";
+            MethodAttributes newAttributes = _body.Method.Attributes;
+            //(_body.Method.Name == "Main" && _body.Method.IsStatic) ||
+            if (_body.Method.Name.Equals(".ctor"))
+            {
+                newMethodName = "constructer_weawed";
+                newAttributes = newAttributes & ~MethodAttributes.SpecialName & ~MethodAttributes.RTSpecialName;
+            }
+
+            MethodDefinition newMethod = new MethodDefinition(newMethodName, newAttributes, _body.Method.MethodReturnType.ReturnType);
+            var classWeaved = _body.Method.DeclaringType;
+            copiedInstructions = _body.Instructions.CloneInstructions();
+            copiedExceptionHandlers = _body.ExceptionHandlers.CopyExceptions(copiedInstructions);
+
+            foreach (var methodParam in _body.Method.Parameters)
+            {
+                newMethod.Parameters.Add(methodParam);
+            }
+
+            foreach (var tmp in _body.Variables)
+            {
+                newMethod.Body.Variables.Add(tmp);
+            }
+
+            foreach (var copiedInst in copiedInstructions) //_body.Instructions)
+            {
+                //if (IsConstructorCall(copiedInst) && Isconstuctor) // < firstRealInstructionIndex)
+                //{                
+                //    continue;
+                //}
+                newMethod.Body.Instructions.Add(copiedInst);
+            }
+
+            foreach (ExceptionHandler exHandler in _body.ExceptionHandlers.CopyExceptions(newMethod.Body.Instructions))
+            {
+                newMethod.Body.ExceptionHandlers.Add(exHandler);
+            }
+
+            classWeaved.Methods.Add(newMethod);
+            newMethod.Body.Optimize();
+        }
+
         /// <summary>
         /// Runs the method weaver which adds trace logs if required and rewrites static log calls
         /// </summary>
@@ -102,13 +162,13 @@ namespace Tracer.Fody.Weavers
 
             if (addTrace)
             {
+                //PrintBodyInstructions(_body.Method.Name + " ---start--");
                 WeaveTraceEnter(parameters);
                 WeaveTraceLeave(parameters);
                 WeaveIf();
+                //PrintBodyInstructions(_body.Method.Name + " ---end--");
             }
-
-            SearchForAndReplaceStaticLogCalls();
-
+             SearchForAndReplaceStaticLogCalls();
             _body.InitLocals = true;
             _body.OptimizeMacros();
         }

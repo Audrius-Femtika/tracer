@@ -74,14 +74,10 @@ namespace Tracer.Fody.Helpers
         public static IEnumerable<Instruction> CloneInstructions(this IEnumerable<Instruction> instructions)
         {
             List<Instruction> clonedInstructions = new List<Instruction>();
-            int instructionOffset = 0;
-
             foreach (Instruction instr in instructions)
             {
-                instr.Offset = instructionOffset;
                 Instruction clonedInstruction = instr.CloneInstruction();
                 clonedInstructions.Add(clonedInstruction);
-                ++instructionOffset;
             };
 
             var mapInstructions = clonedInstructions.GetReferenceMap();
@@ -101,7 +97,23 @@ namespace Tracer.Fody.Helpers
             var newInstr = Instruction.Create(OpCodes.Nop);
             newInstr.OpCode = instr.OpCode;
             newInstr.Offset = instr.Offset;
-            newInstr.Operand = instr.Operand;
+            if (instr.Operand is Instruction opInstruction)
+            {
+                newInstr.Operand = opInstruction.CloneInstruction();
+            }
+            else if (instr.Operand is Instruction[] opInstructions)
+            {
+                Instruction[] clonedInstructions = new Instruction[opInstructions.Length];
+                for (int no = 0; no < opInstructions.Length; no++)
+                {
+                    clonedInstructions[no] = opInstructions[no].CloneInstruction();
+                }
+                newInstr.Operand = clonedInstructions;
+            }
+            else
+            {
+                newInstr.Operand = instr.Operand;
+            }
             return newInstr;
         }
 
@@ -110,13 +122,15 @@ namespace Tracer.Fody.Helpers
         /// </summary>
         private static IDictionary<int, Instruction> GetReferenceMap(this IEnumerable<Instruction> instructionsWithOffsets)
         {
-            return instructionsWithOffsets.ToDictionary(x => x.Offset, y => y);
+            // constructors have more instructions with 0 offset, so we take the last one with same offset.
+            var smth = instructionsWithOffsets.GroupBy(e => e.Offset).Select(g => g.Last());
+            return smth.ToDictionary(x => x.Offset, y => y);
         }
 
         /// <summary>
         /// After cloning if branches shows jump to original instuction instead new one. Calling this function on inctructions will fix it.
         /// </summary>
-        public static void FixBranching(this Instruction instr, IDictionary<int,Instruction> referenceMap)
+        public static void FixBranching(this Instruction instr, IDictionary<int, Instruction> referenceMap)
         {
             if (instr.Operand is Instruction)
             {
@@ -126,7 +140,14 @@ namespace Tracer.Fody.Helpers
             else if (instr.Operand is Instruction[])
             {
                 Instruction[] operandInstructions = (Instruction[])instr.Operand;
-                foreach(Instruction  operandInstruction in operandInstructions)
+                Instruction[] mappedInstructions = new Instruction[operandInstructions.Length];
+
+                for (int no = 0; no < operandInstructions.Length; no++)
+                {
+                    mappedInstructions[no] = referenceMap[operandInstructions[no].Offset];
+                }
+                instr.Operand = mappedInstructions;
+                foreach (Instruction operandInstruction in operandInstructions)
                 {
                     operandInstruction.FixBranching(referenceMap);
                 }

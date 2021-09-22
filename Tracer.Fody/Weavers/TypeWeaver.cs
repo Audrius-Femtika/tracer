@@ -71,8 +71,9 @@ namespace Tracer.Fody.Weavers
         private bool MethodHasCompilerGeneratedAttribute(MethodDefinition methodDefinition)
         {
             var hasAttribute = methodDefinition.HasCustomAttributes && methodDefinition.CustomAttributes
-                                              .Any(attr => attr.AttributeType.FullName.Equals(typeof(CompilerGeneratedAttribute).FullName,
-                                                  StringComparison.Ordinal));
+                                              .Any(attr => attr.AttributeType.FullName.Equals(typeof(CompilerGeneratedAttribute).FullName, StringComparison.Ordinal) ||
+                                                   attr.AttributeType.FullName.Equals(typeof(System.CodeDom.Compiler.GeneratedCodeAttribute).FullName, StringComparison.Ordinal)
+                                              );
 
             //local functions and generated property accessors should be instrumented
             if (hasAttribute && (methodDefinition.Name.Contains("|") || methodDefinition.IsPropertyAccessor())) return false;

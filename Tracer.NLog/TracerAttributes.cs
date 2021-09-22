@@ -1,4 +1,4 @@
-﻿using System;
+﻿/*using System;
 
 // ReSharper disable once CheckNamespace
 namespace TracerAttributes
@@ -44,4 +44,4 @@ namespace TracerAttributes
     {
     }
 
-}
+}*/

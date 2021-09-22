@@ -12,16 +12,11 @@ namespace Tracer.Fody.Weavers
     /// </summary>
     internal class MethodWeaver : MethodWeaverBase
     {
-        IEnumerable<Instruction> copiedInstructions;
-        ICollection<ExceptionHandler> copiedExceptionHandlers;
 
         internal MethodWeaver(TypeReferenceProvider typeReferenceProvider, MethodReferenceProvider methodReferenceProvider,
             ILoggerProvider loggerProvider, MethodDefinition methodDefinition) : base(typeReferenceProvider, methodReferenceProvider,
                 loggerProvider, methodDefinition)
-        {
-            copiedInstructions = _body.Instructions.CloneInstructions();
-            copiedExceptionHandlers = _body.ExceptionHandlers.CopyExceptions(copiedInstructions);
-        }
+        {}
 
         override protected void WeaveIf()
         {
