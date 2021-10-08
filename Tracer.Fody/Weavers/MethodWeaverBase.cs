@@ -56,8 +56,11 @@ namespace Tracer.Fody.Weavers
 
             HasNoTraceOnReturnValue = _methodDefinition.CustomAttributes.Any(attr =>
                                           attr.AttributeType.FullName.Equals("TracerAttributes.NoReturnTrace", StringComparison.Ordinal));
-            copiedInstructions = _body.Instructions.CloneInstructions();
-            copiedExceptionHandlers = _body.ExceptionHandlers.CopyExceptions(copiedInstructions);
+            if (Globals.AddOptimizedIfWrappig)
+            {
+                copiedInstructions = _body.Instructions.CloneInstructions();
+                copiedExceptionHandlers = _body.ExceptionHandlers.CopyExceptions(copiedInstructions);
+            }
         }
 
         private bool IsConstructorCall(Instruction ins)
@@ -165,7 +168,10 @@ namespace Tracer.Fody.Weavers
                 //PrintBodyInstructions(_body.Method.Name + " ---start--");
                 WeaveTraceEnter(parameters);
                 WeaveTraceLeave(parameters);
-                WeaveIf();
+                if (Globals.AddOptimizedIfWrappig)
+                {
+                    WeaveIf();
+                }
                 //PrintBodyInstructions(_body.Method.Name + " ---end--");
             }
              SearchForAndReplaceStaticLogCalls();
